@@ -155,7 +155,7 @@ mark{background:var(--yellow);color:#14202e;border-radius:2px;padding:0 1px}
   <button class="menu-btn" id="menuBtn" aria-controls="nav" aria-expanded="false">☰ Разделы</button>
   <div class="brand"><i aria-hidden="true"></i>Шпаргалка ПДД</div>
   <div class="field"><input id="search" type="search" placeholder="Поиск по вопросам и подсказкам…  ( / )" aria-label="Поиск" autocomplete="off"></div>
-  <input id="jump" type="text" placeholder="12-7" aria-label="Перейти к билету и вопросу, например 12-7" autocomplete="off" inputmode="numeric">
+  <input id="jump" type="text" placeholder="12.7" aria-label="Перейти к билету и вопросу, например 12.7" autocomplete="off" inputmode="decimal" enterkeyhint="go">
 </div></header>
 <div class="scrim" id="scrim" hidden></div>
 <div class="wrap grid">
@@ -250,7 +250,7 @@ function render(scrollTop=true){
   const imgs=list.filter(q=>q.img).length;
   $('#meta').textContent=`${list.length} ${plural(list.length,'вопрос','вопроса','вопросов')} · ${imgs} с картинкой`;
   document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('on',!query && a.dataset.v===c.nav));
-  if(!list.length){$('#cards').innerHTML=`<div class="empty">Ничего не найдено. Попробуйте другое слово или номер вида <span class="kbd">12-7</span>.</div>`;return}
+  if(!list.length){$('#cards').innerHTML=`<div class="empty">Ничего не найдено. Попробуйте другое слово. Чтобы открыть вопрос по номеру, введите <span class="kbd">12.7</span> в поле справа.</div>`;return}
   const shown=list.slice(0,limit);
   $('#cards').innerHTML=shown.map(card).join('')+(list.length>limit?`<button class="more" id="more">Показать ещё ${list.length-limit}</button>`:'');
   document.title=c.title+' · Шпаргалка ПДД';
@@ -266,13 +266,19 @@ function route(){
 window.addEventListener('hashchange',route);
 let tmr;
 $('#search').addEventListener('input',e=>{clearTimeout(tmr);tmr=setTimeout(()=>{query=e.target.value.trim();limit=60;render()},150)});
-$('#jump').addEventListener('keydown',e=>{
-  if(e.key!=='Enter') return;
-  const n=e.target.value.match(/\d+/g); if(!n) return;
+// Jump: "12.7", "12,7", "12-7", "12 7" → ticket 12 question 7; "12" → whole ticket.
+// Phone number pads have no Enter/dash, so also jump on "Готово" (change) and shortly after a complete "N.N" is typed.
+const jumpEl=$('#jump'); let jt;
+function doJump(){
+  clearTimeout(jt);
+  const n=jumpEl.value.match(/\d+/g); if(!n) return;
   const t=Math.min(40,Math.max(1,+n[0]));
   location.hash= n[1]? `q-${t}-${Math.min(20,Math.max(1,+n[1]))}` : `ticket-${t}`;
-  e.target.value=''; e.target.blur();
-});
+  jumpEl.value=''; jumpEl.blur();
+}
+jumpEl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doJump()}});
+jumpEl.addEventListener('change',doJump);
+jumpEl.addEventListener('input',()=>{clearTimeout(jt); if(/^\s*\d{1,2}\D+\d{1,2}\s*$/.test(jumpEl.value)) jt=setTimeout(doJump,900)});
 document.addEventListener('keydown',e=>{
   if(e.key==='/' && document.activeElement.tagName!=='INPUT'){e.preventDefault();$('#search').focus()}
   if(e.key==='Escape' && document.activeElement===$('#search')){$('#search').value='';query='';render()}
